@@ -17,8 +17,12 @@ async def build_persona(req: SearchRequest) -> PersonaResponse:
     if req.org_context:
         logger.info(f"🏢 조직 컨텍스트: {req.org_context}")
     
-    # Prompt designed to match candidate vector structure exactly
-    prompt = f"""You are a talent search assistant. Generate a persona that matches the database candidate structure to enable optimal vector similarity search.
+    # Prompt: Generate persona with structured SQL filters for precise matching
+    prompt = f"""You are a talent search assistant. Transform the user's natural language query into a structured "persona" that will generate precise SQL WHERE conditions for database search.
+
+**PURPOSE**: The persona will generate search_filters that translate directly into SQL WHERE clauses:
+1. **Structured SQL Search**: Uses LLM-generated WHERE conditions (PRIMARY METHOD)
+2. Field-specific matching using PostgreSQL JSONB operators and text matching
 
 **User Query:** "{req.query_text}"
 
@@ -47,30 +51,45 @@ Skills: {{skills joined by space}}
 Cards: {{cards joined by space}}
 ```
 
-**Your Task:**
-Generate a persona that, when embedded using the SAME format, will match candidates well. Extract:
-1. **domains**: Research fields, domains, disciplines (will become "Keywords" section)
-2. **skills_hard**: Technical skills with levels (names will become "Skills" section)
-3. **skills_soft**: Soft skills, collaboration styles
-4. **titles**: Job titles, academic positions
-5. **outcomes**: Desired achievements, publications, experience (will inform "Introduction")
-6. **query_text**: MUST use the EXACT same format as candidate vectors
+**TARGET SCHEMA (candidates table):**
+```
+name: TEXT
+introduce: TEXT  
+keywords: JSONB array of strings (e.g., ["AI", "Machine Learning"])
+skills: JSONB array of strings (e.g., ["Python", "TensorFlow"])
+cards: JSONB array of objects
+```
 
-**CRITICAL: query_text MUST Match Candidate Vector Format:**
-The query_text field MUST use the EXACT same format as candidate vectors shown above. Generate it using the structure:
-Name: [from titles or generic role if mentioned]
-Introduction: [from outcomes and user requirements]
-Keywords: [all domains space-separated]
-Skills: [all skills_hard names space-separated]
-Cards: [relevant research topics if any, space-separated]
+**Your Task - Generate TWO outputs:**
+1. **Extract structured data** (domains, skills_hard, etc.) - for display/context
+2. **Generate search_filters** - for precise SQL WHERE clause matching
+
+**search_filters MUST be field-specific WHERE conditions:**
+- **keywords_any**: Array of keywords that should match candidates.keywords (use domains)
+  - Example: ["AI", "인공지능", "Machine Learning", "머신러닝"]
+  - PostgreSQL: `keywords ?| array['AI', 'Machine Learning']`
+- **skills_any**: Array of skills that should match candidates.skills (use skills_hard names)
+  - Example: ["Python", "TensorFlow", "Deep Learning"]
+  - PostgreSQL: `skills ?| array['Python', 'TensorFlow']`
+- **introduce_contains**: Key terms that should appear in introduce field
+  - Example: ["연구", "research", "개발"]
+  - PostgreSQL: `introduce ILIKE '%연구%' OR introduce ILIKE '%research%'`
+- **name_contains**: Terms for name field (if title/role specified)
+  - Optional, only if user mentioned specific titles
+
+**Extract information:**
+1. **domains**: → Use for keywords_any in search_filters
+2. **skills_hard**: → Extract skill names for skills_any in search_filters
+3. **outcomes**: → Use for introduce_contains in search_filters
+4. **titles**: Job titles/roles (use for name_contains if relevant)
+5. **query_text**: Simplified version for vector embedding (optional)
 
 **Important Guidelines:**
-- Extract Korean AND English terms as candidates may have either
-- For skills_hard levels: "beginner", "intermediate", "advanced", "expert" (default: "advanced")
-- Keywords should be domain/field tags: ["AI", "Machine Learning", "Computer Vision"]
-- Skills should be specific technical abilities: ["Python", "TensorFlow", "Deep Learning"]
-- Keep all terms searchable and specific (avoid generic terms)
-- If org_context provided, incorporate into org_context fields (mission, stack, collab_style)
+- Extract Korean AND English terms (candidates have both)
+- Keep terms specific and searchable (avoid generic terms)
+- **search_filters is the PRIMARY method** - generate comprehensive filters
+- **query_text** is optional (for legacy vector search, can be simplified)
+- If org_context provided, incorporate into org_context fields
 
 **JSON Schema to follow:**
 {Persona.model_json_schema()}
@@ -87,7 +106,12 @@ Cards: [relevant research topics if any, space-separated]
   "skills_soft": ["Research", "Innovation", "Problem Solving"],
   "seniority": ["senior", "expert"],
   "outcomes": ["AI research", "model development", "publications"],
-  "query_text": "Name: AI Expert\nIntroduction: AI 전문가, 머신러닝 및 딥러닝 연구 분야에서 전문성 보유\nKeywords: Artificial Intelligence Machine Learning Deep Learning Computer Vision AI 인공지능 머신러닝 딥러닝\nSkills: Python TensorFlow Deep Learning\nCards: AI research model development"
+  "query_text": "AI Expert AI 전문가 Machine Learning Deep Learning Python TensorFlow",
+  "search_filters": {{
+    "keywords_any": ["AI", "인공지능", "Artificial Intelligence", "Machine Learning", "머신러닝", "Deep Learning", "딥러닝", "Computer Vision"],
+    "skills_any": ["Python", "TensorFlow", "Deep Learning", "딥러닝"],
+    "introduce_contains": ["AI", "인공지능", "연구", "research", "머신러닝"]
+  }}
 }}
 
 **Note:** The query_text format must EXACTLY match how candidate vectors are structured for optimal vector similarity search.
@@ -144,6 +168,17 @@ Generate the JSON object now (provide only valid JSON, no markdown formatting):"
         logger.info("   - Query Text: N/A")
     
     logger.info("=" * 60)
+
+    # Normalize None values to empty dicts for nested models
+    # Pydantic requires dict or model instance, not None
+    if persona_data.get('constraints_hard') is None:
+        persona_data['constraints_hard'] = {}
+    if persona_data.get('preferences_soft') is None:
+        persona_data['preferences_soft'] = {}
+    if persona_data.get('org_context') is None:
+        persona_data['org_context'] = {}
+    if persona_data.get('search_filters') is None:
+        persona_data['search_filters'] = {}
 
     # Wrap it in the "persona" key as expected by PersonaResponse
     return PersonaResponse(persona=persona_data)

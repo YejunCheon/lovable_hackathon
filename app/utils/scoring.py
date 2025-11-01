@@ -1,5 +1,60 @@
 from collections import defaultdict
 
+def rrf_fusion(vec_results: list[dict], kw_results: list[dict], k: int = 60) -> list[dict]:
+    """
+    Reciprocal Rank Fusion (RRF) - Better blending method than weighted average.
+    RRF combines rankings from multiple sources without requiring score normalization.
+    
+    Formula: score = 1 / (k + rank) for each list, then sum
+    
+    Args:
+        vec_results: Vector search results
+        kw_results: Keyword search results  
+        k: RRF constant (typically 60)
+    
+    Returns:
+        Blended results sorted by RRF score
+    """
+    # Normalize IDs to strings
+    vec_ranks = {str(r['id']): i + 1 for i, r in enumerate(vec_results)}
+    kw_ranks = {str(r['id']): i + 1 for i, r in enumerate(kw_results)}
+    
+    # Combine all document IDs
+    all_ids = set(vec_ranks.keys()) | set(kw_ranks.keys())
+    
+    # Calculate RRF scores
+    rrf_scores = {}
+    for doc_id in all_ids:
+        vec_rank = vec_ranks.get(doc_id)
+        kw_rank = kw_ranks.get(doc_id)
+        
+        rrf_score = 0.0
+        if vec_rank:
+            rrf_score += 1.0 / (k + vec_rank)
+        if kw_rank:
+            rrf_score += 1.0 / (k + kw_rank)
+        
+        rrf_scores[doc_id] = rrf_score
+    
+    # Build result list
+    blended_results = []
+    for doc_id, rrf_score in rrf_scores.items():
+        # Find the original document from either result list
+        doc = next((r for r in vec_results if str(r['id']) == doc_id), None)
+        if doc is None:
+            doc = next((r for r in kw_results if str(r['id']) == doc_id), None)
+        
+        if doc:
+            new_doc = doc.copy()
+            new_doc['score'] = rrf_score
+            blended_results.append(new_doc)
+    
+    # Sort by RRF score in descending order
+    blended_results.sort(key=lambda x: x['score'], reverse=True)
+    
+    return blended_results
+
+
 def blend_scores(vec_results: list[dict], kw_results: list[dict], alpha: float) -> list[dict]:
     """
     Blends scores from vector search and keyword search using a weighted average.
