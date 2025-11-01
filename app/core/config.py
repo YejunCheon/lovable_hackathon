@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     DB_PORT: int
     DB_NAME: str
 
+    # Qdrant settings
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: str | None = None
+    QDRANT_COLLECTION_NAME: str = "candidates"
+
     model_config = SettingsConfigDict(env_file=str(env_path)) # Use absolute path
 
 settings = Settings()
