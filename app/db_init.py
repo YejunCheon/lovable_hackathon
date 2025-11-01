@@ -30,29 +30,22 @@ async def initialize_db():
         );
 
         CREATE TABLE IF NOT EXISTS candidates (
-          id TEXT PRIMARY KEY,
-          org_scope UUID REFERENCES orgs(id),
+          id SERIAL PRIMARY KEY,
           name TEXT NOT NULL,
-          role TEXT,
-          titles TEXT[],
-          department TEXT,
-          location TEXT,
-          keywords TEXT[],
-          skills TEXT[],
-          summary TEXT,
-          profile_md TEXT,
-          avatar_url TEXT,
+          email TEXT NOT NULL UNIQUE,
+          introduce TEXT,
+          keywords JSONB,
+          skills JSONB,
+          cards JSONB,
           vector VECTOR(1536),
-          custom_data JSONB DEFAULT '{}'::jsonb,
-          created_at TIMESTAMPTZ DEFAULT now(),
-          updated_at TIMESTAMPTZ DEFAULT now()
+          created_at TIMESTAMP DEFAULT now()
         );
 
-        CREATE INDEX IF NOT EXISTS idx_candidates_keywords ON candidates USING GIN (keywords);
-        CREATE INDEX IF NOT EXISTS idx_candidates_location ON candidates (location);
-        CREATE INDEX IF NOT EXISTS idx_candidates_role ON candidates (role);
+        CREATE INDEX IF NOT EXISTS idx_candidates_email ON candidates (email);
+        CREATE INDEX IF NOT EXISTS idx_candidates_keywords_gin ON candidates USING GIN (keywords);
+        CREATE INDEX IF NOT EXISTS idx_candidates_skills_gin ON candidates USING GIN (skills);
+        CREATE INDEX IF NOT EXISTS idx_candidates_cards_gin ON candidates USING GIN (cards);
         CREATE INDEX IF NOT EXISTS idx_candidates_vector ON candidates USING ivfflat (vector vector_cosine_ops);
-        CREATE INDEX IF NOT EXISTS idx_candidates_custom_data_gin ON candidates USING GIN (custom_data jsonb_path_ops);
 
         CREATE TABLE IF NOT EXISTS search_audit (
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
