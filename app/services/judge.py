@@ -57,6 +57,11 @@ async def judge_candidate(query: str, candidate: Dict[str, Any]) -> Dict[str, An
     
     try:
         response_text = await gemini_flash_json(prompt)
+        if '```json' in response_text:
+            response_text = response_text.split('```json')[1].split("```")[0]
+        elif '```' in response_text:
+            response_text = response_text.split('```')[1].split("```")[0]
+
         # The gemini_flash_json function is expected to return a JSON string.
         # We will parse it into our Pydantic model for validation.
         judge_result = JudgeOutput.parse_raw(response_text)
