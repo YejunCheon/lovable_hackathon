@@ -19,7 +19,7 @@ async def gemini_flash_json(prompt: str) -> str:
     
     # Try to disable reasoning if the parameter exists
     # Common parameters: reasoning_threshold, use_reasoning, reasoning_mode
-    response = client.models.generate_content(
+    response = await client.aio.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
         config = {
