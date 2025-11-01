@@ -125,12 +125,12 @@ async def search(req: SearchRequest) -> SearchResponse:
         candidates_list = [detailed_candidates_for_judging[cid] for cid in candidate_ids if cid in detailed_candidates_for_judging]
 
         logging.info(f"   → {len(candidates_list)}명 후보에 대한 병렬 평가 시작")
-        judged_results = await judge_parallel(candidates_list, req.query_text, 12)
+        judged_results = await judge_parallel(candidates_list, req.query_text, 20)
         
         # Sort by fit_score from judge
         judged_results.sort(key=lambda x: x.get('fit_score', 0), reverse=True)
         
-        final_candidates = judged_results[:4]
+        final_candidates = judged_results
         logging.info(f"   → 최종 후보 4명 선택 완료")
 
         # 4. Build response

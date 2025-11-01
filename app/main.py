@@ -1,9 +1,11 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.api import routes_search, routes_candidates, routes_auth
-from app.adapters.pg import connect_db, close_db
 import logging
 import sys
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.adapters.pg import close_db, connect_db
+from app.api import routes_auth, routes_candidates, routes_search
 
 app = FastAPI(
     title="AI Talent Search API",
@@ -49,7 +51,7 @@ app = FastAPI(
 # CORS 미들웨어 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 모든 오리진 허용 (개발용)
+    allow_origins=["http://localhost:5173", "https://ai-hackathon-three-opal.vercel.app"],  # 모든 오리진 허용 (개발용)
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 헤더 허용
