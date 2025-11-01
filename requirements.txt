@@ -7,3 +7,4 @@ pgvector
 pydantic
 python-dotenv
 pydantic-settings
+asyncpg
