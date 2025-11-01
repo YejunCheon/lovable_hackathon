@@ -2,7 +2,6 @@ fastapi
 uvicorn[standard]
 google-generativeai
 psycopg2-binary
-qdrant-client
 pgvector
 pydantic
 python-dotenv

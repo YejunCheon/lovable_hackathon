@@ -227,7 +227,7 @@ Quality	Flash + Judge 강화	4–6s
 
 4.1 Persona Prompt
 	•	목표: 사용자 raw → persona JSON
-	•	모델: Gemini 1.5 Flash (JSON 모드)
+	•	모델: Gemini 2.5 Flash (JSON 모드)
 
 4.2 Judge Prompt
 
@@ -363,7 +363,7 @@ async def search(req: dict):
 15.1 Persona Builder
 
 async def gemini_flash_json(prompt, schema):
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
     resp = await model.generate_content_async(
         [prompt],
         generation_config={"response_mime_type": "application/json"}

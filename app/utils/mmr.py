@@ -13,20 +13,26 @@ def mmr(documents: list[dict], vectors: dict[str, list[float]], lambda_val: floa
     """
     Performs Maximal Marginal Relevance (MMR) to diversify the result set.
     `documents` is the list of candidate documents, sorted by relevance.
-    `vectors` is a dictionary mapping document ID to its vector.
+    `vectors` is a dictionary mapping document ID (as string) to its vector.
     `lambda_val` controls the trade-off between relevance and diversity.
     `k` is the number of results to return.
+    
+    Note: All IDs are normalized to strings for consistent comparison.
     """
     if not documents or not vectors:
         return []
 
+    # Normalize all IDs to strings for consistent comparison
+    # vectors dict keys are strings, document IDs may be int or str
+    vectors_str = {str(k): v for k, v in vectors.items()}
+    
     # Ensure we have vectors for all documents
-    doc_ids_with_vectors = [doc['id'] for doc in documents if doc['id'] in vectors]
+    doc_ids_with_vectors = [str(doc['id']) for doc in documents if str(doc['id']) in vectors_str]
     if not doc_ids_with_vectors:
         return documents[:k] # Return top k if no vectors are available
 
     # Normalize relevance scores (original scores from blended search)
-    scores = {doc['id']: doc['score'] for doc in documents}
+    scores = {str(doc['id']): doc['score'] for doc in documents}
     max_score = max(scores.values()) if scores else 0
     if max_score > 0:
         for doc_id in scores:
@@ -48,7 +54,7 @@ def mmr(documents: list[dict], vectors: dict[str, list[float]], lambda_val: floa
             # Calculate similarity with already selected documents
             max_sim = 0
             if selected_ids:
-                sims = [cosine_similarity(vectors[doc_id], vectors[sel_id]) for sel_id in selected_ids]
+                sims = [cosine_similarity(vectors_str[doc_id], vectors_str[sel_id]) for sel_id in selected_ids]
                 if sims:
                     max_sim = max(sims)
             
@@ -64,7 +70,8 @@ def mmr(documents: list[dict], vectors: dict[str, list[float]], lambda_val: floa
         remaining_ids.remove(best_id)
 
     # Return the selected documents in the order they were selected
-    final_documents = [doc for doc in documents if doc['id'] in selected_ids]
-    final_documents.sort(key=lambda doc: selected_ids.index(doc['id']))
+    # Compare with normalized string IDs
+    final_documents = [doc for doc in documents if str(doc['id']) in selected_ids]
+    final_documents.sort(key=lambda doc: selected_ids.index(str(doc['id'])))
     
     return final_documents

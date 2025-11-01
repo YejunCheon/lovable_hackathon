@@ -87,6 +87,8 @@ async def db_keyword_topk(persona: dict, k: int) -> list[dict]:
     """
     Performs a keyword-based search on the database using the new schema.
     Searches in name, introduce, and JSONB fields (keywords, skills, cards).
+    
+    Uses plainto_tsquery instead of to_tsquery to handle multi-word phrases better.
     """
     if _pool is None:
         raise ConnectionError("Database pool not initialized. Call connect_db() first.")
@@ -96,15 +98,23 @@ async def db_keyword_topk(persona: dict, k: int) -> list[dict]:
     search_terms = [skill['name'] for skill in search_keywords if isinstance(skill, dict)]
     search_terms.extend(persona["persona"].get("domains", []))
     search_terms.extend(persona["persona"].get("outcomes", []))
-    search_terms = list(set(search_terms)) # Remove duplicates
+    search_terms = list(set(search_terms))  # Remove duplicates
 
     if not search_terms:
-        return []
+        # Fallback to query_text if no search terms found
+        query_text = persona.get("persona", {}).get("query_text", "")
+        if query_text:
+            search_terms = [query_text]
+        else:
+            return []
 
-    # Build search query for JSONB fields and text fields
-    # JSONB fields need to be converted to text for full-text search
-    query_str = ' | '.join(search_terms)
+    # Build search query string
+    # plainto_tsquery is more lenient and handles multi-word phrases better
+    # It automatically handles spaces and special characters
+    query_str = ' '.join(search_terms)
     
+    # Use plainto_tsquery which is more forgiving with natural language queries
+    # It treats the input as plain text and converts it to a tsquery automatically
     query_parts = [
         "SELECT id, name, email, introduce, keywords, skills, cards, created_at, "
         "ts_rank_cd(to_tsvector('english', "
@@ -114,7 +124,7 @@ async def db_keyword_topk(persona: dict, k: int) -> list[dict]:
         "COALESCE(skills::text, '') || ' ' || "
         "COALESCE(cards::text, '')"
         "), query) as rank "
-        "FROM candidates, to_tsquery('english', $1) query "
+        "FROM candidates, plainto_tsquery('english', $1) query "
         "WHERE query @@ to_tsvector('english', "
         "COALESCE(name, '') || ' ' || "
         "COALESCE(introduce, '') || ' ' || "
@@ -132,6 +142,20 @@ async def db_keyword_topk(persona: dict, k: int) -> list[dict]:
     final_query = " ".join(query_parts)
 
     async with _pool.acquire() as connection:
-        rows = await connection.fetch(final_query, *params)
+        try:
+            rows = await connection.fetch(final_query, *params)
+        except Exception as e:
+            logging.error(f"Keyword search query failed: {final_query}")
+            logging.error(f"Query parameters: {params}")
+            logging.error(f"Search terms: {search_terms}")
+            raise
 
-    return [dict(row) for row in rows]
+    # Return results as list of dicts
+    # Ensure ID is consistent (convert to string for consistency with vector search)
+    results = []
+    for row in rows:
+        result = dict(row)
+        # Normalize ID to string for consistency with vector search
+        result['id'] = str(result['id'])
+        results.append(result)
+    return results

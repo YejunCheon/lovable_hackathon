@@ -176,13 +176,13 @@ def search_professors(user_input: str, max_professors: int = None) -> Dict[str, 
     
     print(f"\nGemini 2.5 Pro 모델 호출 중...")
     # Gemini 2.5 Pro 모델 사용
-    # 참고: 모델이 없다면 "gemini-1.5-pro" 또는 "gemini-pro"로 변경해주세요
+    # 참고: 모델이 없다면 "gemini-2.5-pro" 또는 "gemini-pro"로 변경해주세요
     try:
         model = genai.GenerativeModel("gemini-2.5-pro")
     except Exception:
-        # 만약 gemini-2.5-pro가 없다면 gemini-1.5-pro 사용
-        print("Warning: gemini-2.5-pro를 찾을 수 없습니다. gemini-1.5-pro를 사용합니다.")
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        # 만약 gemini-2.5-pro가 없다면 gemini-2.5-pro 사용
+        print("Warning: gemini-2.5-pro를 찾을 수 없습니다. gemini-2.5-pro를 사용합니다.")
+        model = genai.GenerativeModel("gemini-2.5-pro")
     
     try:
         response = model.generate_content(

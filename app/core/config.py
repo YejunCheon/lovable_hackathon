@@ -14,10 +14,7 @@ class Settings(BaseSettings):
     DB_PORT: int
     DB_NAME: str
 
-    # Qdrant settings
-    QDRANT_URL: str = "http://localhost:6333"
-    QDRANT_API_KEY: str | None = None
-    QDRANT_COLLECTION_NAME: str = "candidates"
+    # pgvector is used via PostgreSQL (no separate service needed)
 
     # Supabase settings
     SUPABASE_URL: str
