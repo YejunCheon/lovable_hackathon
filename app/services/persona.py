@@ -17,44 +17,60 @@ async def build_persona(req: SearchRequest) -> PersonaResponse:
     if req.org_context:
         logger.info(f"🏢 조직 컨텍스트: {req.org_context}")
     
-    # Enhanced prompt that reflects actual candidate data structure
-    prompt = f"""You are a talent search assistant. Based on the user's natural language query, extract structured search criteria to find the best matching candidates.
+    # Prompt designed to match candidate vector structure exactly
+    prompt = f"""You are a talent search assistant. Generate a persona that matches the database candidate structure to enable optimal vector similarity search.
 
 **User Query:** "{req.query_text}"
 
 **Organizational Context:** {req.org_context or "Not provided"}
 
-**Database Schema Information:**
-- Candidates have: name, email, introduce (text), keywords (string array), skills (string array), cards (structured data)
-- Keywords are typically domain/field tags (e.g., ["AI", "Machine Learning", "Computer Vision"])
-- Skills are specific technical abilities (e.g., ["Python", "TensorFlow", "Deep Learning"])
-- Cards contain structured profile information (research areas, publications, etc.)
+**CRITICAL: Database Schema (candidates table):**
+```
+id SERIAL PRIMARY KEY
+name TEXT NOT NULL
+email TEXT NOT NULL UNIQUE
+introduce TEXT
+keywords JSONB (array of strings)
+skills JSONB (array of strings)
+cards JSONB (array of objects)
+vector VECTOR(1536)
+created_at TIMESTAMP
+```
+
+**How Candidate Vectors are Created:**
+Candidates are embedded using this exact format:
+```
+Name: {{candidate_name}}
+Introduction: {{introduce}}
+Keywords: {{keywords joined by space}}
+Skills: {{skills joined by space}}
+Cards: {{cards joined by space}}
+```
 
 **Your Task:**
-Generate a structured persona JSON object that extracts search-relevant information from the query. Focus on:
-1. **domains**: Research fields, academic disciplines, or industry domains mentioned
-2. **skills_hard**: Technical skills, programming languages, tools, methodologies (each with name and level: "beginner", "intermediate", "advanced", or "expert")
-3. **skills_soft**: Soft skills, collaboration styles, communication abilities
-4. **titles**: Job titles, academic positions, or roles (e.g., "Professor", "Researcher", "Engineer")
-5. **outcomes**: Desired achievements, publications, experience (e.g., "top-tier papers", "industry collaboration")
-6. **query_text**: A refined, concise version of the search query optimized for semantic search
+Generate a persona that, when embedded using the SAME format, will match candidates well. Extract:
+1. **domains**: Research fields, domains, disciplines (will become "Keywords" section)
+2. **skills_hard**: Technical skills with levels (names will become "Skills" section)
+3. **skills_soft**: Soft skills, collaboration styles
+4. **titles**: Job titles, academic positions
+5. **outcomes**: Desired achievements, publications, experience (will inform "Introduction")
+6. **query_text**: MUST use the EXACT same format as candidate vectors
+
+**CRITICAL: query_text MUST Match Candidate Vector Format:**
+The query_text field MUST use the EXACT same format as candidate vectors shown above. Generate it using the structure:
+Name: [from titles or generic role if mentioned]
+Introduction: [from outcomes and user requirements]
+Keywords: [all domains space-separated]
+Skills: [all skills_hard names space-separated]
+Cards: [relevant research topics if any, space-separated]
 
 **Important Guidelines:**
-- Extract Korean and English terms as they appear (candidates may have Korean keywords/skills)
-- For skills_hard, infer appropriate levels based on context (if not specified, use "advanced")
-- Keep domains and skills specific and searchable (avoid overly generic terms)
-- If organizational context is provided, incorporate it into org_context fields (mission, stack, collab_style)
-
-**CRITICAL: query_text Format:**
-The `query_text` field will be used for vector embedding and MUST follow the same format as candidate vectors:
-```
-Introduction: [concise description based on domains, outcomes, and requirements]
-Keywords: [space-separated list of domains and relevant terms]
-Skills: [space-separated list of skill names from skills_hard]
-```
-
-This ensures the query vector matches the structure of candidate vectors, which are created from:
-"Name: {{name}}\nIntroduction: {{introduce}}\nKeywords: {{keywords}}\nSkills: {{skills}}\nCards: {{cards}}"
+- Extract Korean AND English terms as candidates may have either
+- For skills_hard levels: "beginner", "intermediate", "advanced", "expert" (default: "advanced")
+- Keywords should be domain/field tags: ["AI", "Machine Learning", "Computer Vision"]
+- Skills should be specific technical abilities: ["Python", "TensorFlow", "Deep Learning"]
+- Keep all terms searchable and specific (avoid generic terms)
+- If org_context provided, incorporate into org_context fields (mission, stack, collab_style)
 
 **JSON Schema to follow:**
 {Persona.model_json_schema()}
@@ -71,8 +87,10 @@ This ensures the query vector matches the structure of candidate vectors, which 
   "skills_soft": ["Research", "Innovation", "Problem Solving"],
   "seniority": ["senior", "expert"],
   "outcomes": ["AI research", "model development", "publications"],
-  "query_text": "Introduction: AI 전문가, 머신러닝 및 딥러닝 연구 분야에서 전문성 보유\nKeywords: Artificial Intelligence Machine Learning Deep Learning Computer Vision\nSkills: Python TensorFlow Deep Learning"
+  "query_text": "Name: AI Expert\nIntroduction: AI 전문가, 머신러닝 및 딥러닝 연구 분야에서 전문성 보유\nKeywords: Artificial Intelligence Machine Learning Deep Learning Computer Vision AI 인공지능 머신러닝 딥러닝\nSkills: Python TensorFlow Deep Learning\nCards: AI research model development"
 }}
+
+**Note:** The query_text format must EXACTLY match how candidate vectors are structured for optimal vector similarity search.
 
 Generate the JSON object now (provide only valid JSON, no markdown formatting):"""
 
@@ -113,10 +131,18 @@ Generate the JSON object now (provide only valid JSON, no markdown formatting):"
     
     # Log extracted persona information
     logger.info("✅ Persona 생성 완료:")
-    logger.info(f"   - Query Text: {persona_data.get('query_text', 'N/A')}")
-    logger.info(f"   - Domains: {persona_data.get('domains', [])}")
-    logger.info(f"   - Skills: {[s.get('name', '') for s in persona_data.get('skills_hard', [])]}")
-    logger.info(f"   - Titles: {persona_data.get('titles', [])}")
+    
+    # Parse and display query_text structure (matching candidate vector format)
+    query_text = persona_data.get('query_text', '')
+    if query_text:
+        logger.info("   📋 Query Text (Vector Format):")
+        # Split by lines to show structure
+        for line in query_text.split('\n'):
+            if line.strip():
+                logger.info(f"      {line}")
+    else:
+        logger.info("   - Query Text: N/A")
+    
     logger.info("=" * 60)
 
     # Wrap it in the "persona" key as expected by PersonaResponse
