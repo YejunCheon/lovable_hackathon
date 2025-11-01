@@ -2,19 +2,25 @@
 import logging
 from app.adapters import pg, gemini
 
+# 로거 생성 (명시적으로 로거 이름 지정)
+logger = logging.getLogger(__name__)
+
 async def generate_vectors_for_candidates():
     """
     Fetches candidates with NULL vectors, generates embeddings, and updates them in the DB.
     """
     try:
         # 1. Fetch candidates with NULL vectors
-        candidates_to_update = await pg.execute_query("SELECT id, name, introduce, keywords, skills, cards FROM candidates WHERE vector IS NULL")
+        rows = await pg.execute_query("SELECT id, name, introduce, keywords, skills, cards FROM candidates WHERE vector IS NULL")
+        
+        # Convert asyncpg Record objects to dictionaries
+        candidates_to_update = [dict(row) for row in rows] if rows else []
 
         if not candidates_to_update:
-            logging.info("No candidates found with NULL vectors. All vectors are up to date.")
-            return {"message": "No candidates to update."}
+            logger.info("No candidates found with NULL vectors. All vectors are up to date.")
+            return {"message": "No candidates to update.", "count": 0}
 
-        logging.info(f"Found {len(candidates_to_update)} candidates to process for vector generation.")
+        logger.info(f"Found {len(candidates_to_update)} candidates to process for vector generation.")
 
         for candidate in candidates_to_update:
             try:
@@ -44,15 +50,18 @@ async def generate_vectors_for_candidates():
                     vector,
                     candidate['id']
                 )
-                logging.info(f"Successfully generated and updated vector for candidate ID: {candidate['id']}")
+                logger.info(f"Successfully generated and updated vector for candidate ID: {candidate['id']}")
 
             except Exception as e:
-                logging.error(f"Failed to process candidate ID {candidate.get('id', 'N/A')}: {e}")
+                logger.error(f"Failed to process candidate ID {candidate.get('id', 'N/A')}: {e}")
         
-        return {"message": f"Successfully generated vectors for {len(candidates_to_update)} candidates."}
+        return {
+            "message": f"Successfully generated vectors for {len(candidates_to_update)} candidates.",
+            "count": len(candidates_to_update)
+        }
 
     except Exception as e:
-        logging.error(f"An error occurred during the vector generation process: {e}")
+        logger.error(f"An error occurred during the vector generation process: {e}")
         # In a real app, you might want to raise an HTTPException here
         # to be handled by the API layer.
         raise

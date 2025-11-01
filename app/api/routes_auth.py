@@ -11,6 +11,7 @@ from app.schemas.auth import (
     OAuthInitResponse,
 )
 from app.adapters.supabase import get_supabase_client
+from app.adapters.pg import execute_query
 from app.core.config import settings
 from supabase import Client
 import logging
@@ -44,16 +45,45 @@ async def signup(request: SignUpRequest):
             email=response.user.email,
             message="회원가입이 완료되었습니다."
         )
+    except HTTPException:
+        # HTTPException은 그대로 전파
+        raise
     except Exception as e:
+        error_message = str(e).lower()
         logging.error(f"Signup error: {e}")
-        if "already registered" in str(e).lower() or "already exists" in str(e).lower():
+        
+        # 이메일 비율 제한 에러 처리
+        if "rate limit" in error_message or "too many requests" in error_message:
+            raise HTTPException(
+                status_code=429,
+                detail="이메일 전송 비율 제한에 걸렸습니다. 잠시 후 다시 시도해주세요."
+            )
+        
+        # 이미 등록된 이메일 에러 처리
+        if "already registered" in error_message or "already exists" in error_message or "user already registered" in error_message:
             raise HTTPException(
                 status_code=400,
                 detail="이미 등록된 이메일입니다."
             )
+        
+        # 잘못된 이메일 형식
+        if "invalid email" in error_message or "email format" in error_message:
+            raise HTTPException(
+                status_code=400,
+                detail="올바른 이메일 형식이 아닙니다."
+            )
+        
+        # 약한 비밀번호
+        if "password" in error_message and ("weak" in error_message or "too short" in error_message):
+            raise HTTPException(
+                status_code=400,
+                detail="비밀번호가 너무 약합니다. 더 강한 비밀번호를 사용해주세요."
+            )
+        
+        # 기타 에러는 일반 500 에러로 처리
         raise HTTPException(
             status_code=500,
-            detail=f"회원가입 중 오류가 발생했습니다: {str(e)}"
+            detail="회원가입 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
         )
 
 @router.post("/auth/signin", response_model=SignInResponse)

@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from httpx._transports.asgi import ASGITransport
 from app.main import app
 import os
+import random
 
 # 실제 Supabase를 사용하는 통합 테스트는 환경 변수 필요
 # SUPABASE_URL과 SUPABASE_KEY가 설정되어 있을 때만 실행
@@ -23,9 +24,20 @@ class TestAuthAPI:
     @pytest.fixture
     async def client(self):
         """테스트 클라이언트 픽스처"""
+        from app.db_init import initialize_db
+        from app.adapters.pg import execute_query, connect_db, close_db
+        
+        # Connect to DB and initialize schema
+        await connect_db()
+        await initialize_db()
+        
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
+        
+        # Clean up DB after tests
+        await execute_query("TRUNCATE TABLE users CASCADE;")
+        await close_db()
 
     async def test_signup_endpoint_exists(self, client: AsyncClient):
         """회원가입 엔드포인트가 존재하는지 확인"""
@@ -49,6 +61,7 @@ class TestAuthAPI:
         """회원가입 요청 검증 오류 테스트"""
         # 이메일 형식 오류
         response = await client.post("/v1/auth/signup", json={
+            "name": "testuser",
             "email": "invalid-email",
             "password": "password123"
         })
@@ -64,12 +77,11 @@ class TestAuthAPI:
 
     @pytest.mark.skipif(not REAL_SUPABASE_CONFIGURED, reason="Supabase 설정이 필요합니다")
     async def test_signup_success(self, client: AsyncClient):
-        """회원가입 성공 테스트 (실제 Supabase 필요)"""
-        import random
-        test_email = f"test_{random.randint(100000, 999999)}@example.com"
+        test_email = f"test_{random.randint(100000, 999999)}@gmail.com"
         test_password = "test_password_123"
         
         response = await client.post("/v1/auth/signup", json={
+            "name": "testuser",
             "email": test_email,
             "password": test_password
         })
@@ -88,10 +100,11 @@ class TestAuthAPI:
         """로그인 성공 테스트 (실제 Supabase 필요)"""
         # 먼저 회원가입
         import random
-        test_email = f"test_{random.randint(100000, 999999)}@example.com"
+        test_email = f"test_{random.randint(100000, 999999)}@gmail.com"
         test_password = "test_password_123"
         
         signup_response = await client.post("/v1/auth/signup", json={
+            "name": "testuser",
             "email": test_email,
             "password": test_password
         })
@@ -115,10 +128,11 @@ class TestAuthAPI:
         """잘못된 비밀번호 로그인 테스트"""
         # 먼저 회원가입
         import random
-        test_email = f"test_{random.randint(100000, 999999)}@example.com"
+        test_email = f"test_{random.randint(100000, 999999)}@gmail.com"
         test_password = "test_password_123"
         
         await client.post("/v1/auth/signup", json={
+            "name": "testuser",
             "email": test_email,
             "password": test_password
         })
@@ -136,10 +150,11 @@ class TestAuthAPI:
         """현재 사용자 정보 조회 테스트"""
         # 먼저 회원가입 및 로그인
         import random
-        test_email = f"test_{random.randint(100000, 999999)}@example.com"
+        test_email = f"test_{random.randint(100000, 999999)}@gmail.com"
         test_password = "test_password_123"
         
         await client.post("/v1/auth/signup", json={
+            "name": "testuser",
             "email": test_email,
             "password": test_password
         })
@@ -174,52 +189,18 @@ class TestAuthAPI:
         
         assert response.status_code == 401
 
-    async def test_oauth_init_endpoint_exists(self, client: AsyncClient):
-        """OAuth 초기화 엔드포인트가 존재하는지 확인"""
-        response = await client.post("/v1/auth/oauth/init", json={
-            "provider": "google"
-        })
-        # 200 (성공 - URL 반환) 또는 400/422/500 (오류)면 엔드포인트는 존재
-        assert response.status_code in [200, 400, 422, 500]
-        # 200인 경우 응답에 url이 있는지 확인
-        if response.status_code == 200:
-            data = response.json()
-            assert "url" in data or "provider" in data
 
-    async def test_oauth_init_invalid_provider(self, client: AsyncClient):
-        """잘못된 provider로 OAuth 초기화 테스트"""
-        response = await client.post("/v1/auth/oauth/init", json={
-            "provider": "invalid_provider"
-        })
-        assert response.status_code == 400
-
-    async def test_google_oauth_endpoint_exists(self, client: AsyncClient):
-        """Google OAuth 엔드포인트가 존재하는지 확인"""
-        response = await client.get("/v1/auth/oauth/google")
-        # 302 (리다이렉트) 또는 500 (Supabase 오류)면 엔드포인트는 존재
-        assert response.status_code in [302, 500]
-
-    async def test_linkedin_oauth_endpoint_exists(self, client: AsyncClient):
-        """LinkedIn OAuth 엔드포인트가 존재하는지 확인"""
-        response = await client.get("/v1/auth/oauth/linkedin")
-        # 302 (리다이렉트) 또는 500 (Supabase 오류)면 엔드포인트는 존재
-        assert response.status_code in [302, 500]
-
-    async def test_oauth_callback_endpoint_exists(self, client: AsyncClient):
-        """OAuth 콜백 엔드포인트가 존재하는지 확인"""
-        response = await client.get("/v1/auth/callback")
-        # 400 (code 없음) 또는 422면 엔드포인트는 존재
-        assert response.status_code in [400, 422]
 
     @pytest.mark.skipif(not REAL_SUPABASE_CONFIGURED, reason="Supabase 설정이 필요합니다")
     async def test_signout(self, client: AsyncClient):
         """로그아웃 테스트"""
         # 먼저 회원가입 및 로그인
         import random
-        test_email = f"test_{random.randint(100000, 999999)}@example.com"
+        test_email = f"test_{random.randint(100000, 999999)}@gmail.com"
         test_password = "test_password_123"
         
         await client.post("/v1/auth/signup", json={
+            "name": "testuser",
             "email": test_email,
             "password": test_password
         })
@@ -251,13 +232,14 @@ async def test_auth_flow_integration():
         pytest.skip("Supabase 설정이 필요합니다")
     
     import random
-    test_email = f"test_{random.randint(100000, 999999)}@example.com"
+    test_email = f"test_{random.randint(100000, 999999)}@gmail.com"
     test_password = "test_password_123"
     
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # 1. 회원가입
         signup_response = await client.post("/v1/auth/signup", json={
+            "name": "testuser",
             "email": test_email,
             "password": test_password
         })

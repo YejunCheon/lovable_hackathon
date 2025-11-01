@@ -22,10 +22,11 @@ async def initialize_db():
         );
 
         CREATE TABLE IF NOT EXISTS users (
-          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-          org_id UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+          id UUID PRIMARY KEY,
+          org_id UUID REFERENCES orgs(id) ON DELETE CASCADE,
+          name TEXT,
           email TEXT UNIQUE NOT NULL,
-          role TEXT DEFAULT 'member',
+          role TEXT DEFAULT 'normal',
           created_at TIMESTAMPTZ DEFAULT now()
         );
 
@@ -69,8 +70,6 @@ async def initialize_db():
     except Exception as e:
         logging.error(f"Database initialization failed: {e}")
         raise
-    finally:
-        await close_db()
 
 if __name__ == "__main__":
     load_dotenv()

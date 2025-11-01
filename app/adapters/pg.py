@@ -10,30 +10,34 @@ async def connect_db():
     Initializes the PostgreSQL connection pool.
     """
     global _pool
-    if _pool is None:
-        try:
-            # Supabase requires SSL connection
-            # Create SSL context for Supabase (verify mode is CERT_NONE for Supabase's self-signed certs)
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            
-            _pool = await asyncpg.create_pool(
-                user=settings.DB_USER,
-                password=settings.DB_PASSWORD,
-                host=settings.DB_HOST,
-                port=settings.DB_PORT,
-                database=settings.DB_NAME,
-                ssl=ssl_context,  # Supabase requires SSL
-                min_size=1,
-                max_size=10,
-                command_timeout=60
-            )
-            logging.info(f"PostgreSQL connection pool created successfully. Connected to {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
-        except Exception as e:
-            logging.error(f"Failed to create PostgreSQL connection pool: {e}")
-            logging.error(f"Connection details: host={settings.DB_HOST}, port={settings.DB_PORT}, database={settings.DB_NAME}, user={settings.DB_USER}")
-            raise
+    if _pool is not None and not _pool.is_closing():
+        # Pool is already active, do nothing
+        return
+
+    # If pool is None or closed, create a new one
+    try:
+        # Supabase requires SSL connection
+        # Create SSL context for Supabase (verify mode is CERT_NONE for Supabase's self-signed certs)
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        _pool = await asyncpg.create_pool(
+            user=settings.DB_USER,
+            password=settings.DB_PASSWORD,
+            host=settings.DB_HOST,
+            port=settings.DB_PORT,
+            database=settings.DB_NAME,
+            ssl=ssl_context,  # Supabase requires SSL
+            min_size=1,
+            max_size=10,
+            command_timeout=60
+        )
+        logging.info(f"PostgreSQL connection pool created successfully. Connected to {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
+    except Exception as e:
+        logging.error(f"Failed to create PostgreSQL connection pool: {e}")
+        logging.error(f"Connection details: host={settings.DB_HOST}, port={settings.DB_PORT}, database={settings.DB_NAME}, user={settings.DB_USER}")
+        raise
 
 async def close_db():
     """

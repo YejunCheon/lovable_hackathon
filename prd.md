@@ -26,7 +26,6 @@
     │     ├─ Retriever:
     │     │     ├─ Vector Search (Qdrant/pgvector)
     │     │     └─ DB Filter (PostgreSQL)
-    │     ├─ (Opt) Re-ranker (Gemini Pro)
     │     └─ AI Judge (Gemini Flash, parallel)
     ├─ ProfileCard Assembler
     └─ Telemetry (OTel)
@@ -199,13 +198,10 @@ CREATE TABLE search_audit (
 	•	Score blending: final = α*cos + (1-α)*bm25 (기본 α=0.6)
 	•	Hard constraints (직군, 지역 등): RDB WHERE 절
 
-3️⃣ (옵션) Re-ranker (Gemini Pro)
-→ 상위 50~200 후보를 한 번에 평가해 정렬
-
-4️⃣ AI as Judge (Gemini Flash)
+3️⃣ AI as Judge (Gemini Flash)
 → 상위 8~12명 병렬 평가, 근거 생성(구어체)
 
-5️⃣ ProfileCard Assembler
+4️⃣ ProfileCard Assembler
 → 상위 4명 RDB 조회, JSONB(custom_data) 포함해 출력
 
 ⸻
@@ -213,9 +209,9 @@ CREATE TABLE search_audit (
 3.2 Latency 예산 (Gemini API 기준)
 
 모드	구성	평균 응답시간
-Speed	Flash only, no Re-rank	2.2–3.5s
-Balanced	Flash + Pro 1회	3.5–5.0s
-Quality	Pro 중심	6–9s
+Speed	Flash only	2.2–3.5s
+Balanced	Flash 중심	3.5–5.0s
+Quality	Flash + Judge 강화	4–6s
 
 
 ⸻
@@ -223,7 +219,7 @@ Quality	Pro 중심	6–9s
 3.3 다양성 & 품질
 	•	MMR (Maximal Marginal Relevance) → 중복 억제
 	•	RRF (Reciprocal Rank Fusion) → 여러 랭킹 융합
-	•	Re-ranker 후 Top 8만 Judge → 품질/속도 균형
+	•	Hybrid Retrieval 후 Top 8~12만 Judge → 품질/속도 균형
 
 ⸻
 
@@ -297,7 +293,7 @@ app/
   main.py
   api/routes_search.py
   core/config.py
-  services/{persona,retrieve,rerank,judge,cards}.py
+  services/{persona,retrieve,judge,cards}.py
   adapters/{gemini,qdrant,pg,redis_cache}.py
   schemas/{persona,search,candidate,judge}.py
   utils/{scoring,mmr,rrf,backoff}.py
@@ -308,8 +304,7 @@ app/
 async def search(req: dict):
     persona = await build_persona(req)
     initial = await hybrid_retrieve(persona)
-    reranked = await maybe_rerank(initial, persona)
-    topK = reranked[:12]
+    topK = initial[:12]
     judged = await judge_parallel(topK, persona)
     final4 = sorted(judged, key=lambda x: x["fit_score"], reverse=True)[:4]
     cards = await load_cards([c["candidate_id"] for c in final4])
@@ -386,15 +381,7 @@ async def hybrid_retrieve(persona):
     diverse = mmr(cut, lambda x: x["vector"], k=12)
     return diverse
 
-15.3 Re-rank
-
-async def maybe_rerank(items, persona, use=True):
-    if not use: return items
-    prompt = {"persona": persona["persona"], "candidates": items}
-    scored = await gemini_pro_call("rerank_template", prompt)
-    return sorted(scored, key=lambda x: x["score"], reverse=True)
-
-15.4 Judge 병렬 호출
+15.3 Judge 병렬 호출
 
 async def judge_parallel(cands, persona, batch=8):
     out = []

@@ -5,3 +5,6 @@ __pycache__/
 *.pyd
 venv/
 .venv/
+docs/openapi.json
+docs/openapi.yaml
+docs/postman_collection.json

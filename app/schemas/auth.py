@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 class SignUpRequest(BaseModel):
+    name: str
     email: EmailStr
     password: str
 
