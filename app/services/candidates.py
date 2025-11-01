@@ -47,7 +47,7 @@ async def generate_vectors_for_candidates():
                 # 4. Update the candidate's vector in the database
                 await pg.execute_query(
                     "UPDATE candidates SET vector = $1 WHERE id = $2",
-                    vector,
+                    str(vector),
                     candidate['id']
                 )
                 logger.info(f"Successfully generated and updated vector for candidate ID: {candidate['id']}")
