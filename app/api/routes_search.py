@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from app.schemas.search import SearchRequest, SearchResponse, CandidateSearchResult
 from app.services.persona import build_persona
 from app.services.retrieve import hybrid_retrieve
+from app.services.judge import judge_parallel
 from app.adapters.pg import _pool
 import logging
 import time
@@ -123,48 +124,36 @@ async def search(req: SearchRequest) -> SearchResponse:
                 latency_ms=latency_ms
             )
         
-        # 3. Get top 4 candidates (before judge step - PRD shows judge comes later)
-        logging.info("\n[Phase 3] 후보자 상세 정보 로드")
-        logging.info(f"   → 상위 {len(retrieval_results)}개 중 상위 4개 선택")
-        top_candidates = retrieval_results[:4]
-        # IDs are normalized to strings in retrieval, convert to int for DB query
-        candidate_ids = []
-        for cand in top_candidates:
-            if 'id' in cand:
-                try:
-                    candidate_ids.append(int(cand['id']))
-                except (ValueError, TypeError):
-                    logging.warning(f"Invalid candidate ID: {cand.get('id')}")
+        # 3. AI as Judge
+        logging.info("\n[Phase 3] AI as Judge 단계")
+        candidates_for_judging = retrieval_results[:12] # Top 12 for judging
+        candidate_ids_for_judging = [int(c['id']) for c in candidates_for_judging]
         
-        if not candidate_ids:
-            logging.warning("⚠️  유효한 후보자 ID 없음")
-            latency_ms = int((time.time() - start_time) * 1000)
-            logging.info(f"⏱️  총 소요 시간: {latency_ms}ms")
-            logging.info("=" * 60 + "\n")
-            return SearchResponse(
-                query_summary=query_summary,
-                candidates_top4=[],
-                latency_ms=latency_ms
-            )
+        logging.info(f"   → 상위 {len(candidate_ids_for_judging)}명 후보 상세 정보 로드")
+        detailed_candidates_for_judging = await load_candidate_details(candidate_ids_for_judging)
+
+        if not detailed_candidates_for_judging:
+            raise Exception("Could not load details for judging candidates.")
+
+        # Convert dict to list for judge_parallel
+        candidates_list = [detailed_candidates_for_judging[cid] for cid in candidate_ids_for_judging if cid in detailed_candidates_for_judging]
+
+        logging.info(f"   → {len(candidates_list)}명 후보에 대한 병렬 평가 시작")
+        judged_results = await judge_parallel(candidates_list, persona_dict)
         
-        logging.info(f"   → 후보자 ID: {candidate_ids}")
-        # 4. Load full candidate details from database
-        candidate_details = await load_candidate_details(candidate_ids)
-        logging.info(f"   ✅ {len(candidate_details)}개 후보자 상세 정보 로드 완료")
+        # Sort by fit_score from judge
+        judged_results.sort(key=lambda x: x.get('fit_score', 0), reverse=True)
         
-        # 5. Build response matching PRD format
+        final_candidates = judged_results[:4]
+        logging.info(f"   → 최종 후보 4명 선택 완료")
+
+        # 4. Build response
         logging.info("\n[Phase 4] 응답 구성")
         candidates_top4 = []
-        for cand in top_candidates:
-            try:
-                cand_id = int(cand['id'])
-            except (ValueError, TypeError):
-                logging.warning(f"Skipping candidate with invalid ID: {cand.get('id')}")
-                continue
-            details = candidate_details.get(cand_id, {})
+        for judged_cand in final_candidates:
+            cand_id = int(judged_cand['candidate_id'])
+            details = detailed_candidates_for_judging.get(cand_id, {})
             
-            # Merge retrieval score as fit_score
-            # Note: Judge step (fit_score, reason_ko) comes later in PRD pipeline
             candidate_result = CandidateSearchResult(
                 id=cand_id,
                 name=details.get('name', ''),
@@ -172,13 +161,13 @@ async def search(req: SearchRequest) -> SearchResponse:
                 keywords=details.get('keywords', []),
                 skills=details.get('skills', []),
                 cards=details.get('cards', []),
-                fit_score=cand.get('score', 0.0),  # From retrieval, will be replaced by judge later
-                reason_ko=None,  # Will be filled by judge step
+                fit_score=judged_cand.get('fit_score', 0.0),
+                reason_ko=judged_cand.get('reason_ko'),
                 email=details.get('email'),
                 created_at=details.get('created_at')
             )
             candidates_top4.append(candidate_result)
-            logging.info(f"   ✅ {details.get('name', 'Unknown')} (ID: {cand_id}, Score: {cand.get('score', 0):.4f})")
+            logging.info(f"   ✅ {details.get('name', 'Unknown')} (ID: {cand_id}, Score: {judged_cand.get('fit_score', 0):.2f})")
         
         latency_ms = int((time.time() - start_time) * 1000)
         logging.info(f"\n⏱️  총 소요 시간: {latency_ms}ms")
