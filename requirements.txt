@@ -8,3 +8,9 @@ pydantic
 python-dotenv
 pydantic-settings
 asyncpg
+supabase
+python-jose[cryptography]
+passlib[bcrypt]
+pytest
+pytest-asyncio
+httpx

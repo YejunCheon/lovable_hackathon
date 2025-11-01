@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str | None = None
     QDRANT_COLLECTION_NAME: str = "candidates"
 
+    # Supabase settings
+    SUPABASE_URL: str
+    SUPABASE_KEY: str
+
     model_config = SettingsConfigDict(env_file=str(env_path)) # Use absolute path
 
 settings = Settings()

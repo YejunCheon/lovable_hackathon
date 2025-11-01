@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import routes_search
+from app.api import routes_search, routes_candidates, routes_auth
 from app.adapters.pg import connect_db, close_db
 
 app = FastAPI(
@@ -9,6 +9,8 @@ app = FastAPI(
 )
 
 app.include_router(routes_search.router, prefix="/v1")
+app.include_router(routes_candidates.router, prefix="/v1")
+app.include_router(routes_auth.router, prefix="/v1")
 
 @app.on_event("startup")
 async def startup_event():
