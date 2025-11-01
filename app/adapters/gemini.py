@@ -1,4 +1,5 @@
 import google.generativeai as genai
+
 from app.core.config import settings
 
 # Configure the generative AI model

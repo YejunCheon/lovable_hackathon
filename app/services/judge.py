@@ -1,10 +1,11 @@
 import asyncio
 import logging
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+from pydantic import ValidationError
 
 from app.adapters.gemini import gemini_flash_json
 from app.schemas.judge import JudgeOutput
-from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,11 @@ async def judge_candidate(persona: Dict[str, Any], candidate: Dict[str, Any]) ->
     
     try:
         response_text = await gemini_flash_json(prompt)
+        if '```json' in response_text:
+            response_text = response_text.split('```json')[1].split("```")[0]
+        elif '```' in response_text:
+            response_text = response_text.split('```')[1].split("```")[0]
+
         # The gemini_flash_json function is expected to return a JSON string.
         # We will parse it into our Pydantic model for validation.
         judge_result = JudgeOutput.parse_raw(response_text)
