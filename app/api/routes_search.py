@@ -1,13 +1,18 @@
-from fastapi import APIRouter, HTTPException
-from app.schemas.search import SearchRequest, SearchResponse, CandidateSearchResult
-from app.services.persona import build_persona
-from app.services.retrieve import hybrid_retrieve
-from app.services.judge import judge_parallel
-from app.adapters.pg import _pool
+import json
 import logging
 import time
-import json
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, HTTPException
+
+from app.adapters.pg import _pool
+from app.schemas.search import CandidateSearchResult, SearchRequest, SearchResponse
+from app.services.batch_embedding import batch_embedding
+from app.services.diversify import diversify_search_query
+from app.services.judge import judge_parallel
+from app.services.persona import build_persona
+from app.services.retrieve import hybrid_retrieve
+from app.services.search_profile_with_vectors import search_profile_with_vectors
 
 router = APIRouter()
 
@@ -17,7 +22,7 @@ async def load_candidate_details(candidate_ids: List[int]) -> Dict[int, Dict[str
     Loads full candidate details from database by IDs.
     Returns a dictionary mapping candidate ID to candidate data.
     """
-    from app.adapters.pg import connect_db, _pool
+    from app.adapters.pg import _pool, connect_db
     
     # Import pool dynamically to ensure it's current
     if _pool is None:
@@ -103,43 +108,24 @@ async def search(req: SearchRequest) -> SearchResponse:
     logging.info(f"📥 요청: {req.query_text}")
     
     try:
-        # 1. Build persona from query
-        logging.info("\n[Phase 1] Persona 생성 단계")
-        persona_response = await build_persona(req)
-        persona_dict = persona_response.model_dump()
-        query_summary = persona_dict.get("persona", {}).get("query_text", req.query_text)
-        
-        # 2. Perform Hybrid Retrieval
-        logging.info("\n[Phase 2] Hybrid Retrieval 단계")
-        retrieval_results = await hybrid_retrieve(persona_dict, use_vector_search=True)
-        
-        if not retrieval_results:
-            logging.warning("⚠️  검색 결과 없음")
-            latency_ms = int((time.time() - start_time) * 1000)
-            logging.info(f"⏱️  총 소요 시간: {latency_ms}ms")
-            logging.info("=" * 60 + "\n")
-            return SearchResponse(
-                query_summary=query_summary,
-                candidates_top4=[],
-                latency_ms=latency_ms
-            )
+        search_queries = diversify_search_query(req.query_text)
+        print(search_queries)
+        embeddings = batch_embedding(search_queries)
+        candidate_ids = await search_profile_with_vectors(embeddings)
         
         # 3. AI as Judge
         logging.info("\n[Phase 3] AI as Judge 단계")
-        candidates_for_judging = retrieval_results[:12] # Top 12 for judging
-        candidate_ids_for_judging = [int(c['id']) for c in candidates_for_judging]
-        
-        logging.info(f"   → 상위 {len(candidate_ids_for_judging)}명 후보 상세 정보 로드")
-        detailed_candidates_for_judging = await load_candidate_details(candidate_ids_for_judging)
+        logging.info(f"   → 상위 {len(candidate_ids)}명 후보 상세 정보 로드")
+        detailed_candidates_for_judging = await load_candidate_details(candidate_ids)
 
         if not detailed_candidates_for_judging:
             raise Exception("Could not load details for judging candidates.")
 
         # Convert dict to list for judge_parallel
-        candidates_list = [detailed_candidates_for_judging[cid] for cid in candidate_ids_for_judging if cid in detailed_candidates_for_judging]
+        candidates_list = [detailed_candidates_for_judging[cid] for cid in candidate_ids if cid in detailed_candidates_for_judging]
 
         logging.info(f"   → {len(candidates_list)}명 후보에 대한 병렬 평가 시작")
-        judged_results = await judge_parallel(candidates_list, persona_dict)
+        judged_results = await judge_parallel(candidates_list, req.query_text)
         
         # Sort by fit_score from judge
         judged_results.sort(key=lambda x: x.get('fit_score', 0), reverse=True)
@@ -173,9 +159,11 @@ async def search(req: SearchRequest) -> SearchResponse:
         logging.info(f"\n⏱️  총 소요 시간: {latency_ms}ms")
         logging.info(f"✅ 검색 완료: {len(candidates_top4)}개 후보 반환")
         logging.info("=" * 60 + "\n")
+
+        print(candidates_top4)
         
         return SearchResponse(
-            query_summary=query_summary,
+            query_summary="",
             candidates_top4=candidates_top4,
             latency_ms=latency_ms
         )

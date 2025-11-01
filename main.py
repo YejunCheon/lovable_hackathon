@@ -5,9 +5,10 @@ Gemini 2.5 Pro를 사용하여 교수 데이터에서 적합한 교수를 검색
 import json
 import os
 from pathlib import Path
-from typing import List, Dict, Any
-import google.generativeai as genai
+from typing import Any, Dict, List
+
 from dotenv import load_dotenv
+from google import genai
 
 # .env 파일 로드
 load_dotenv()
@@ -17,7 +18,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
 
-genai.configure(api_key=GEMINI_API_KEY)
+# genai.configure(api_key=GEMINI_API_KEY)
 
 # 프로젝트 루트 디렉토리
 PROJECT_ROOT = Path(__file__).parent

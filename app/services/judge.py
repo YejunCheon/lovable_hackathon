@@ -1,14 +1,15 @@
 import asyncio
 import logging
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+from pydantic import ValidationError
 
 from app.adapters.gemini import gemini_flash_json
 from app.schemas.judge import JudgeOutput
-from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
-def create_judge_prompt(persona: Dict[str, Any], candidate: Dict[str, Any]) -> str:
+def create_judge_prompt(query: str, candidate: Dict[str, Any]) -> str:
     """
     Creates the prompt for the AI Judge to evaluate a single candidate against a persona.
     """
@@ -35,8 +36,8 @@ Your response MUST be a JSON object that strictly follows this format:
 3.  **Reasoning:** The `reason_ko` must be a concise, compelling, and conversational summary of why the candidate is a good fit.
 
 --- 
-**Persona:**
-{persona}
+**User Query:**
+{query}
 
 ---
 **Candidate Data:**
@@ -48,11 +49,11 @@ Now, provide your evaluation in the specified JSON format only.
 """
     return prompt
 
-async def judge_candidate(persona: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[str, Any]:
+async def judge_candidate(query: str, candidate: Dict[str, Any]) -> Dict[str, Any]:
     """
     Judges a single candidate and returns the structured output.
     """
-    prompt = create_judge_prompt(persona, candidate)
+    prompt = create_judge_prompt(query, candidate)
     
     try:
         response_text = await gemini_flash_json(prompt)
@@ -68,14 +69,14 @@ async def judge_candidate(persona: Dict[str, Any], candidate: Dict[str, Any]) ->
         logger.error(f"An unexpected error occurred while judging candidate {candidate.get('id')}: {e}")
         return {"candidate_id": candidate.get('id'), "fit_score": 0, "reason_ko": "An unexpected error occurred.", "evidence": []}
 
-async def judge_parallel(candidates: List[Dict[str, Any]], persona: Dict[str, Any], batch_size: int = 8) -> List[Dict[str, Any]]:
+async def judge_parallel(candidates: List[Dict[str, Any]], query: str, batch_size: int = 8) -> List[Dict[str, Any]]:
     """
     Judges a list of candidates in parallel batches.
     """
     judged_results = []
     for i in range(0, len(candidates), batch_size):
         batch = candidates[i:i+batch_size]
-        tasks = [judge_candidate(persona, cand) for cand in batch]
+        tasks = [judge_candidate(query, cand) for cand in batch]
         batch_results = await asyncio.gather(*tasks)
         judged_results.extend(batch_results)
         logger.info(f"Judged batch {i//batch_size + 1}/{(len(candidates) + batch_size - 1)//batch_size}")

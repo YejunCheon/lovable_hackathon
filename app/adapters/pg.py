@@ -1,7 +1,9 @@
-import asyncpg
-from app.core.config import settings
 import logging
 import ssl
+
+import asyncpg
+
+from app.core.config import settings
 
 _pool = None
 
@@ -34,6 +36,7 @@ async def connect_db():
             command_timeout=60
         )
         logging.info(f"PostgreSQL connection pool created successfully. Connected to {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
+        return _pool
     except Exception as e:
         logging.error(f"Failed to create PostgreSQL connection pool: {e}")
         logging.error(f"Connection details: host={settings.DB_HOST}, port={settings.DB_PORT}, database={settings.DB_NAME}, user={settings.DB_USER}")
