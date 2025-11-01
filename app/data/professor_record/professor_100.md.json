@@ -1,0 +1,211 @@
+{
+    "name": "임인성",
+    "email": "ihm@soganag.ac.kr",
+    "introduce": "실시간 렌더링 및 XR 기술 전문가",
+    "keywords": [
+        "볼륨 렌더링",
+        "3D 모델링",
+        "GPU 렌더링",
+        "광선 추적",
+        "AI 이미지 처리",
+        "혼합현실",
+        "공간 컴퓨팅",
+        "VR/AR/XR",
+        "메타버스",
+        "시뮬레이션",
+        "데이터 가시화",
+        "컴퓨터 그래픽스",
+        "디지털 치과",
+        "가상현실"
+    ],
+    "skills": [
+        "실시간 광선 추적",
+        "VR/AR/XR 렌더링",
+        "GPU 컴퓨팅",
+        "컴퓨터 그래픽스",
+        "과학 시각화",
+        "고성능 컴퓨팅",
+        "시각화 기법",
+        "그래픽스 이론 및 응용",
+        "지오메트릭 모델링",
+        "물리기반 모델링",
+        "병렬 연산 기반 그래픽스 알고리즘"
+    ],
+    "cards": [
+        {
+            "type": "table",
+            "name": "기본 정보",
+            "data": [
+                { "cells": [{ "name": "직책", "value": "교수" }] },
+                { "cells": [{ "name": "소속", "value": "서강대학교" }] },
+                { "cells": [{ "name": "학과", "value": "컴퓨터공학과" }] },
+                { "cells": [{ "name": "사무실 번호", "value": "027115278" }] },
+                {
+                    "cells": [
+                        { "name": "연구실", "value": "컴퓨터 그래픽스 연구실" }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "links",
+            "name": "관련 링크",
+            "data": [
+                {
+                    "name": "연구자 홈페이지",
+                    "href": "http://grmanet.sogang.ac.kr/people_professor.html"
+                },
+                {
+                    "name": "연구실 홈페이지",
+                    "href": "http://grmanet.sogang.ac.kr/"
+                }
+            ]
+        },
+        {
+            "type": "text",
+            "name": "연구 및 강의 분야",
+            "data": "[연구 분야] 핵심 분야: 컴퓨터 그래픽스, 과학 시각화, 고성능 컴퓨팅 (High Performance Computing) 세부 분야: 시각화 기법, 그래픽스 이론 및 응용, 지오메트릭 모델링, 물리기반 모델링, 병렬 연산 기반 그래픽스 알고리즘 등 [대표 연구 내용] 임인성 교는 컴퓨터 그래픽스 및 과학 시각화 분야에서 이론적 연구와 실용적 응용을 아우르는 연구를 활발히 수행해왔습니다. 특히 고성능 컴퓨팅 기반의 시각화 알고리즘과 복잡한 과학 데이터를 효과적으로 시각화하는 기술 개발에 주력하고 있으며, 그래픽스 이론과 실제 렌더링 시스템의 효율을 동시에 추구하는 연구를 통해 학계 및 산업계에 기여하고 있습니다. 또한, 지오메트릭 모델링, 솔리드 및 물리기반 모델링(SPM), 볼륨 및 포인트 기반 그래픽스 등 다수의 핵심 기술 분야에서 성과를 발표하며 국제 그래픽스 학회 프로그램 위원으로 지속적인 학술 서비스 활동을 수행하고 있습니다. 이를 통해 컴퓨터 그래픽스 기술의 이론적 깊이와 산업적 확장성 모두에 긍정적인 영향을 미치고 있습니다."
+        },
+        {
+            "type": "table",
+            "name": "학술 활동 및 프로그램 위원 참여",
+            "data": [
+                {
+                    "cells": [
+                        { "name": "학회명", "value": "Pacific Graphics" },
+                        {
+                            "name": "참여",
+                            "value": "2007 (USA), 2008 (Japan), 2009 (Korea), 2010 (China), 2011 (Taiwan), 2012 (Hong Kong), 2014 (Korea)"
+                        }
+                    ]
+                },
+                {
+                    "cells": [
+                        {
+                            "name": "학회명",
+                            "value": "International Conference on Computer Graphics Theory and Applications (GRAPP)"
+                        },
+                        {
+                            "name": "참여",
+                            "value": "2007 (Spain), 2009 (Portugal), 2011 (Portugal), 2012 (Italy), 2013 (Spain), 2014 (Portugal)"
+                        }
+                    ]
+                },
+                {
+                    "cells": [
+                        { "name": "학회명", "value": "ACM SIGGRAPH ASIA" },
+                        {
+                            "name": "참여",
+                            "value": "2011 (Hong Kong, Sketches & Posters), 2012 (Singapore, Posters)"
+                        }
+                    ]
+                },
+                {
+                    "cells": [
+                        {
+                            "name": "학회명",
+                            "value": "Geometric Modeling and Processing (GMP)"
+                        },
+                        { "name": "참여", "value": "2012 (China)" }
+                    ]
+                },
+                {
+                    "cells": [
+                        {
+                            "name": "학회명",
+                            "value": "Symposium on Solid and Physical Modeling (SPM)"
+                        },
+                        { "name": "참여", "value": "2012 (France)" }
+                    ]
+                },
+                {
+                    "cells": [
+                        {
+                            "name": "학회명",
+                            "value": "SIAM/ACM Joint Conference on Geometric & Physical Modeling"
+                        },
+                        { "name": "참여", "value": "2011 (USA)" }
+                    ]
+                },
+                {
+                    "cells": [
+                        {
+                            "name": "학회명",
+                            "value": "Eurographics/IEEE VGTC Symposium on Volume and Point-Based Graphics"
+                        },
+                        { "name": "참여", "value": "2008 (USA)" }
+                    ]
+                },
+                {
+                    "cells": [
+                        {
+                            "name": "학회명",
+                            "value": "IEEE/Eurographics International Symposium on Volume Graphics"
+                        },
+                        { "name": "참여", "value": "2007 (Czech Republic)" }
+                    ]
+                },
+                {
+                    "cells": [
+                        {
+                            "name": "학회명",
+                            "value": "International Conference on Computer Animation and Social Agents (CASA)"
+                        },
+                        { "name": "참여", "value": "2008 (Korea)" }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "table",
+            "name": "학력",
+            "data": [
+                {
+                    "cells": [
+                        { "name": "기간", "value": "1981-1985" },
+                        { "name": "학위", "value": "B.S." },
+                        {
+                            "name": "학교/학과",
+                            "value": "서울대학교 컴퓨터공학 및 통계학"
+                        }
+                    ]
+                },
+                {
+                    "cells": [
+                        { "name": "기간", "value": "1985-1987" },
+                        { "name": "학위", "value": "M.S." },
+                        {
+                            "name": "학교/학과",
+                            "value": "Rutgers University 컴퓨터공학"
+                        }
+                    ]
+                },
+                {
+                    "cells": [
+                        { "name": "기간", "value": "1987-1991" },
+                        { "name": "학위", "value": "Ph.D." },
+                        {
+                            "name": "학교/학과",
+                            "value": "Purdue University 컴퓨터공학"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "table",
+            "name": "문의처 (서강대학교)",
+            "data": [
+                {
+                    "cells": [
+                        { "name": "담당자", "value": "서강대학교산학협력단" }
+                    ]
+                },
+                {
+                    "cells": [{ "name": "이메일", "value": "tlo@sogang.ac.kr" }]
+                },
+                { "cells": [{ "name": "연락처", "value": "02-3274-4863" }] }
+            ]
+        }
+    ]
+}
