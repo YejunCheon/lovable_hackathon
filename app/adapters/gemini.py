@@ -8,7 +8,7 @@ async def gemini_flash_json(prompt: str) -> str:
     """
     Calls the Gemini 1.5 Flash model with a specific prompt and returns the response as a JSON string.
     """
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
     resp = await model.generate_content_async(
         [prompt],
         generation_config={"response_mime_type": "application/json"}
