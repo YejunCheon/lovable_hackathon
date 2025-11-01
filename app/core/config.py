@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Supabase settings
     SUPABASE_URL: str
     SUPABASE_KEY: str
+    OAUTH_REDIRECT_URL: str = "http://localhost:8000/v1/auth/callback"
 
     model_config = SettingsConfigDict(env_file=str(env_path)) # Use absolute path
 

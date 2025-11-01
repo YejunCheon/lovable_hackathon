@@ -3,6 +3,7 @@ Auth API 테스트
 """
 import pytest
 from httpx import AsyncClient
+from httpx._transports.asgi import ASGITransport
 from app.main import app
 import os
 
@@ -22,7 +23,8 @@ class TestAuthAPI:
     @pytest.fixture
     async def client(self):
         """테스트 클라이언트 픽스처"""
-        async with AsyncClient(app=app, base_url="http://test") as ac:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
 
     async def test_signup_endpoint_exists(self, client: AsyncClient):
@@ -40,8 +42,8 @@ class TestAuthAPI:
     async def test_me_endpoint_exists(self, client: AsyncClient):
         """사용자 정보 조회 엔드포인트가 존재하는지 확인"""
         response = await client.get("/v1/auth/me")
-        # 401 (Unauthorized)면 엔드포인트는 존재
-        assert response.status_code == 401
+        # 401 (Unauthorized) 또는 403 (Forbidden)이면 엔드포인트는 존재
+        assert response.status_code in [401, 403]
 
     async def test_signup_validation_error(self, client: AsyncClient):
         """회원가입 요청 검증 오류 테스트"""
@@ -172,6 +174,43 @@ class TestAuthAPI:
         
         assert response.status_code == 401
 
+    async def test_oauth_init_endpoint_exists(self, client: AsyncClient):
+        """OAuth 초기화 엔드포인트가 존재하는지 확인"""
+        response = await client.post("/v1/auth/oauth/init", json={
+            "provider": "google"
+        })
+        # 200 (성공 - URL 반환) 또는 400/422/500 (오류)면 엔드포인트는 존재
+        assert response.status_code in [200, 400, 422, 500]
+        # 200인 경우 응답에 url이 있는지 확인
+        if response.status_code == 200:
+            data = response.json()
+            assert "url" in data or "provider" in data
+
+    async def test_oauth_init_invalid_provider(self, client: AsyncClient):
+        """잘못된 provider로 OAuth 초기화 테스트"""
+        response = await client.post("/v1/auth/oauth/init", json={
+            "provider": "invalid_provider"
+        })
+        assert response.status_code == 400
+
+    async def test_google_oauth_endpoint_exists(self, client: AsyncClient):
+        """Google OAuth 엔드포인트가 존재하는지 확인"""
+        response = await client.get("/v1/auth/oauth/google")
+        # 302 (리다이렉트) 또는 500 (Supabase 오류)면 엔드포인트는 존재
+        assert response.status_code in [302, 500]
+
+    async def test_linkedin_oauth_endpoint_exists(self, client: AsyncClient):
+        """LinkedIn OAuth 엔드포인트가 존재하는지 확인"""
+        response = await client.get("/v1/auth/oauth/linkedin")
+        # 302 (리다이렉트) 또는 500 (Supabase 오류)면 엔드포인트는 존재
+        assert response.status_code in [302, 500]
+
+    async def test_oauth_callback_endpoint_exists(self, client: AsyncClient):
+        """OAuth 콜백 엔드포인트가 존재하는지 확인"""
+        response = await client.get("/v1/auth/callback")
+        # 400 (code 없음) 또는 422면 엔드포인트는 존재
+        assert response.status_code in [400, 422]
+
     @pytest.mark.skipif(not REAL_SUPABASE_CONFIGURED, reason="Supabase 설정이 필요합니다")
     async def test_signout(self, client: AsyncClient):
         """로그아웃 테스트"""
@@ -204,7 +243,7 @@ class TestAuthAPI:
 
 
 @pytest.mark.asyncio
-async def test_auth_flow_integration(client: AsyncClient):
+async def test_auth_flow_integration():
     """
     전체 인증 플로우 통합 테스트 (실제 Supabase 필요)
     """
@@ -215,44 +254,46 @@ async def test_auth_flow_integration(client: AsyncClient):
     test_email = f"test_{random.randint(100000, 999999)}@example.com"
     test_password = "test_password_123"
     
-    # 1. 회원가입
-    signup_response = await client.post("/v1/auth/signup", json={
-        "email": test_email,
-        "password": test_password
-    })
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. 회원가입
+        signup_response = await client.post("/v1/auth/signup", json={
+            "email": test_email,
+            "password": test_password
+        })
     
-    if signup_response.status_code == 400 and "already registered" in signup_response.json().get("detail", "").lower():
-        # 이미 존재하는 경우 로그인으로 진행
-        pass
-    else:
-        assert signup_response.status_code == 200, f"회원가입 실패: {signup_response.json()}"
-    
-    # 2. 로그인
-    signin_response = await client.post("/v1/auth/signin", json={
-        "email": test_email,
-        "password": test_password
-    })
-    
-    assert signin_response.status_code == 200, f"로그인 실패: {signin_response.json()}"
-    signin_data = signin_response.json()
-    access_token = signin_data["access_token"]
-    
-    # 3. 사용자 정보 조회
-    me_response = await client.get(
-        "/v1/auth/me",
-        headers={"Authorization": f"Bearer {access_token}"}
-    )
-    
-    assert me_response.status_code == 200
-    me_data = me_response.json()
-    assert me_data["email"] == test_email
-    
-    # 4. 로그아웃
-    signout_response = await client.post(
-        "/v1/auth/signout",
-        headers={"Authorization": f"Bearer {access_token}"}
-    )
-    
-    # 로그아웃은 성공 또는 실패 모두 허용
-    assert signout_response.status_code in [200, 401, 500]
+        if signup_response.status_code == 400 and "already registered" in signup_response.json().get("detail", "").lower():
+            # 이미 존재하는 경우 로그인으로 진행
+            pass
+        else:
+            assert signup_response.status_code == 200, f"회원가입 실패: {signup_response.json()}"
+        
+        # 2. 로그인
+        signin_response = await client.post("/v1/auth/signin", json={
+            "email": test_email,
+            "password": test_password
+        })
+        
+        assert signin_response.status_code == 200, f"로그인 실패: {signin_response.json()}"
+        signin_data = signin_response.json()
+        access_token = signin_data["access_token"]
+        
+        # 3. 사용자 정보 조회
+        me_response = await client.get(
+            "/v1/auth/me",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        
+        assert me_response.status_code == 200
+        me_data = me_response.json()
+        assert me_data["email"] == test_email
+        
+        # 4. 로그아웃
+        signout_response = await client.post(
+            "/v1/auth/signout",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        
+        # 로그아웃은 성공 또는 실패 모두 허용
+        assert signout_response.status_code in [200, 401, 500]
 

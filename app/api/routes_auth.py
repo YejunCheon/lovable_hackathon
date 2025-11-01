@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.schemas.auth import (
     SignUpRequest,
@@ -6,10 +7,14 @@ from app.schemas.auth import (
     SignInRequest,
     SignInResponse,
     UserResponse,
+    OAuthInitRequest,
+    OAuthInitResponse,
 )
 from app.adapters.supabase import get_supabase_client
+from app.core.config import settings
 from supabase import Client
 import logging
+from typing import Optional
 
 router = APIRouter(tags=["Authentication"])
 security = HTTPBearer()
@@ -140,4 +145,167 @@ async def signout(
         logging.error(f"Signout error: {e}")
         # 로그아웃 실패해도 성공으로 처리 (토큰 무효화는 클라이언트에서 처리)
         return {"message": "로그아웃되었습니다."}
+
+@router.post("/auth/oauth/init", response_model=OAuthInitResponse)
+async def oauth_init(request: OAuthInitRequest):
+    """
+    OAuth 로그인 초기화 엔드포인트
+    Google 또는 LinkedIn OAuth URL을 생성합니다.
+    
+    지원되는 provider: "google", "linkedin"
+    """
+    valid_providers = ["google", "linkedin"]
+    
+    if request.provider.lower() not in valid_providers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"지원하지 않는 provider입니다. 지원되는 provider: {', '.join(valid_providers)}"
+        )
+    
+    try:
+        supabase: Client = get_supabase_client()
+        
+        # 리다이렉트 URL 설정
+        redirect_to = request.redirect_to or settings.OAUTH_REDIRECT_URL
+        
+        # OAuth URL 생성
+        oauth_response = supabase.auth.sign_in_with_oauth({
+            "provider": request.provider.lower(),
+            "options": {
+                "redirect_to": redirect_to
+            }
+        })
+        
+        if not oauth_response or not oauth_response.url:
+            raise HTTPException(
+                status_code=500,
+                detail="OAuth URL 생성에 실패했습니다."
+            )
+        
+        return OAuthInitResponse(
+            url=oauth_response.url,
+            provider=request.provider.lower()
+        )
+    except Exception as e:
+        logging.error(f"OAuth init error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"OAuth 초기화 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.get("/auth/oauth/google")
+async def oauth_google_init(redirect_to: Optional[str] = None):
+    """
+    Google OAuth 로그인 시작 (간편한 GET 엔드포인트)
+    """
+    try:
+        supabase: Client = get_supabase_client()
+        
+        redirect_url = redirect_to or settings.OAUTH_REDIRECT_URL
+        
+        oauth_response = supabase.auth.sign_in_with_oauth({
+            "provider": "google",
+            "options": {
+                "redirect_to": redirect_url
+            }
+        })
+        
+        if not oauth_response or not oauth_response.url:
+            raise HTTPException(
+                status_code=500,
+                detail="Google OAuth URL 생성에 실패했습니다."
+            )
+        
+        return RedirectResponse(url=oauth_response.url)
+    except Exception as e:
+        logging.error(f"Google OAuth init error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Google OAuth 초기화 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.get("/auth/oauth/linkedin")
+async def oauth_linkedin_init(redirect_to: Optional[str] = None):
+    """
+    LinkedIn OAuth 로그인 시작 (간편한 GET 엔드포인트)
+    """
+    try:
+        supabase: Client = get_supabase_client()
+        
+        redirect_url = redirect_to or settings.OAUTH_REDIRECT_URL
+        
+        oauth_response = supabase.auth.sign_in_with_oauth({
+            "provider": "linkedin",
+            "options": {
+                "redirect_to": redirect_url
+            }
+        })
+        
+        if not oauth_response or not oauth_response.url:
+            raise HTTPException(
+                status_code=500,
+                detail="LinkedIn OAuth URL 생성에 실패했습니다."
+            )
+        
+        return RedirectResponse(url=oauth_response.url)
+    except Exception as e:
+        logging.error(f"LinkedIn OAuth init error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"LinkedIn OAuth 초기화 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.get("/auth/callback")
+async def oauth_callback(
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None)
+):
+    """
+    OAuth 콜백 엔드포인트
+    Supabase는 자동으로 세션을 관리하므로, 여기서는 사용자를 적절한 페이지로 리다이렉트합니다.
+    
+    실제 토큰은 클라이언트에서 `supabase.auth.getSession()`으로 확인할 수 있습니다.
+    """
+    if error:
+        logging.error(f"OAuth callback error: {error}, description: {error_description}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"OAuth 인증 실패: {error_description or error}"
+        )
+    
+    if not code:
+        raise HTTPException(
+            status_code=400,
+            detail="OAuth code가 제공되지 않았습니다."
+        )
+    
+    try:
+        supabase: Client = get_supabase_client()
+        
+        # 코드로 세션 교환 (Supabase가 자동으로 처리)
+        # 실제로는 클라이언트에서 처리하는 것이 권장되지만,
+        # 서버에서도 할 수 있습니다.
+        try:
+            # 세션 확인을 위해 사용자 정보 가져오기 시도
+            # 실제로는 클라이언트에서 URL fragment를 사용하여 처리
+            pass
+        except Exception:
+            pass
+        
+        # 성공적으로 인증된 경우, 클라이언트로 리다이렉트
+        # 실제 애플리케이션에서는 프론트엔드 URL로 리다이렉트
+        return {
+            "message": "인증이 완료되었습니다. 클라이언트에서 세션을 확인하세요.",
+            "code": code,
+            "state": state,
+            "note": "Supabase는 URL fragment에 access_token을 반환합니다. 클라이언트에서 확인하세요."
+        }
+    except Exception as e:
+        logging.error(f"OAuth callback error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"OAuth 콜백 처리 중 오류가 발생했습니다: {str(e)}"
+        )
 

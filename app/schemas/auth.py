@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 class SignUpRequest(BaseModel):
     email: EmailStr
@@ -22,4 +23,16 @@ class SignInResponse(BaseModel):
 class UserResponse(BaseModel):
     id: str
     email: str
+
+class OAuthInitRequest(BaseModel):
+    provider: str  # "google" or "linkedin"
+    redirect_to: Optional[str] = None
+
+class OAuthInitResponse(BaseModel):
+    url: str
+    provider: str
+
+class OAuthCallbackRequest(BaseModel):
+    code: str
+    state: Optional[str] = None
 

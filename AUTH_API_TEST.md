@@ -77,6 +77,48 @@
   }
   ```
 
+### 5. 소셜 로그인 - OAuth URL 생성
+- **URL**: `POST /v1/auth/oauth/init`
+- **인증**: 불필요
+- **요청 본문**:
+  ```json
+  {
+    "provider": "google",
+    "redirect_to": "http://localhost:3000/auth/callback"
+  }
+  ```
+- **응답 예시**:
+  ```json
+  {
+    "url": "https://api.supabase.co/auth/v1/authorize?...",
+    "provider": "google"
+  }
+  ```
+
+### 6. Google OAuth 로그인 시작
+- **URL**: `GET /v1/auth/oauth/google?redirect_to=http://localhost:3000/auth/callback`
+- **인증**: 불필요
+- **설명**: Google OAuth 페이지로 리다이렉트합니다.
+
+### 7. LinkedIn OAuth 로그인 시작
+- **URL**: `GET /v1/auth/oauth/linkedin?redirect_to=http://localhost:3000/auth/callback`
+- **인증**: 불필요
+- **설명**: LinkedIn OAuth 페이지로 리다이렉트합니다.
+
+### 8. OAuth 콜백
+- **URL**: `GET /v1/auth/callback?code=...&state=...`
+- **인증**: 불필요
+- **설명**: OAuth 인증 완료 후 Supabase가 리다이렉트하는 엔드포인트입니다.
+- **응답 예시**:
+  ```json
+  {
+    "message": "인증이 완료되었습니다. 클라이언트에서 세션을 확인하세요.",
+    "code": "authorization-code",
+    "state": "state-value",
+    "note": "Supabase는 URL fragment에 access_token을 반환합니다. 클라이언트에서 확인하세요."
+  }
+  ```
+
 ---
 
 ## 환경 설정
@@ -88,16 +130,43 @@
    - `SUPABASE_URL`: `https://your-project.supabase.co`
    - `SUPABASE_KEY`: `anon` 또는 `service_role` 키
 
-### 2. 환경 변수 설정
+### 2. 소셜 로그인 Provider 설정
+
+#### Google OAuth 설정
+
+1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트 생성
+2. OAuth 2.0 클라이언트 ID 생성:
+   - 승인된 리다이렉트 URI: `https://your-project.supabase.co/auth/v1/callback`
+3. Supabase 대시보드 > Authentication > Providers > Google:
+   - Google Client ID 입력
+   - Google Client Secret 입력
+   - Enable provider 활성화
+
+#### LinkedIn OAuth 설정
+
+1. [LinkedIn Developers](https://www.linkedin.com/developers/)에서 앱 생성
+2. OAuth 설정:
+   - 승인된 리다이렉트 URL: `https://your-project.supabase.co/auth/v1/callback`
+3. Supabase 대시보드 > Authentication > Providers > LinkedIn:
+   - LinkedIn Client ID 입력
+   - LinkedIn Client Secret 입력
+   - Enable provider 활성화
+
+자세한 설정 방법은 [Supabase Social Login 문서](https://supabase.com/docs/guides/auth/social-login)를 참고하세요.
+
+### 3. 환경 변수 설정
 
 프로젝트 루트의 `.env` 파일에 추가:
 
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key-here
+OAUTH_REDIRECT_URL=http://localhost:8000/v1/auth/callback
 ```
 
-### 3. 서버 실행
+`OAUTH_REDIRECT_URL`은 OAuth 인증 완료 후 리다이렉트될 URL입니다. 실제 프로덕션 환경에서는 프론트엔드 URL로 설정하세요.
+
+### 4. 서버 실행
 
 ```bash
 # 가상환경 활성화
@@ -210,7 +279,41 @@ curl -X POST "http://localhost:8000/v1/auth/signout" \
 }
 ```
 
-### 5. 전체 플로우 예시
+### 5. 소셜 로그인 테스트
+
+#### Google OAuth 테스트
+
+```bash
+# 방법 1: 직접 GET 요청 (브라우저에서 리다이렉트)
+curl -L "http://localhost:8000/v1/auth/oauth/google"
+
+# 방법 2: POST로 OAuth URL 받기
+curl -X POST "http://localhost:8000/v1/auth/oauth/init" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "google",
+    "redirect_to": "http://localhost:3000/auth/callback"
+  }'
+
+# 응답으로 받은 URL로 브라우저 접속
+```
+
+#### LinkedIn OAuth 테스트
+
+```bash
+# 방법 1: 직접 GET 요청 (브라우저에서 리다이렉트)
+curl -L "http://localhost:8000/v1/auth/oauth/linkedin"
+
+# 방법 2: POST로 OAuth URL 받기
+curl -X POST "http://localhost:8000/v1/auth/oauth/init" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "linkedin",
+    "redirect_to": "http://localhost:3000/auth/callback"
+  }'
+```
+
+### 6. 전체 플로우 예시
 
 ```bash
 # 1. 회원가입
